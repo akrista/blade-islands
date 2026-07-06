@@ -41,8 +41,7 @@
     "test": "vitest run",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "lint": "prettier --check .",
-    "prepublishOnly": "npm run lint && npm test"
+    "prepublishOnly": "npm run format:check && npm test"
   },
   "exports": {
     "./react": "./src/react/index.js",

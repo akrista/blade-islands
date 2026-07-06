@@ -176,23 +176,23 @@ resources/js/islands/Account/UsageChart.jsx
 
 The companion Laravel package renders placeholder elements that this runtime looks for. Each placeholder is a `<div>` with a set of `data-*` attributes:
 
-| Attribute       | Always emitted | Description                                                                                              |
-| --------------- | -------------- | -------------------------------------------------------------------------------------------------------- |
-| `data-island`   | yes            | Framework marker. One of `react`, `vue`, or `svelte`. Matches the entry point you import.                |
-| `data-component`| yes            | Component name, relative to your island root. Nested folders use `/` (for example `Billing/Invoices/Table`). |
-| `data-props`    | yes            | JSON-encoded props object. The value is HTML-escaped; the runtime decodes it transparently via `element.dataset.props`. |
-| `data-preserve` | when preserved | `true` if the island was rendered with `preserve: true`. Tells the runtime to keep the mounted instance across repeat boot passes. |
-| `data-key`      | when preserved | Stable identifier for the island. Defaults to `{framework}:{component}` (lowercased) when not provided. Used to keep the DOM identity stable across renders. |
+| Attribute        | Always emitted | Description                                                                                                                                                  |
+| ---------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `data-island`    | yes            | Framework marker. One of `react`, `vue`, or `svelte`. Matches the entry point you import.                                                                    |
+| `data-component` | yes            | Component name, relative to your island root. Nested folders use `/` (for example `Billing/Invoices/Table`).                                                 |
+| `data-props`     | yes            | JSON-encoded props object. The value is HTML-escaped; the runtime decodes it transparently via `element.dataset.props`.                                      |
+| `data-preserve`  | when preserved | `true` if the island was rendered with `preserve: true`. Tells the runtime to keep the mounted instance across repeat boot passes.                           |
+| `data-key`       | when preserved | Stable identifier for the island. Defaults to `{framework}:{component}` (lowercased) when not provided. Used to keep the DOM identity stable across renders. |
 
 A placeholder rendered by `@react('Account/UsageChart', ['stats' => $stats], preserve: true, key: 'usage-chart')` looks like:
 
 ```html
 <div
-    data-island="react"
-    data-component="Account/UsageChart"
-    data-props="&quot;stats&quot;:{&quot;revenue&quot;:4200}"
-    data-preserve="true"
-    data-key="usage-chart"
+  data-island="react"
+  data-component="Account/UsageChart"
+  data-props='"stats":{"revenue":4200}'
+  data-preserve="true"
+  data-key="usage-chart"
 ></div>
 ```
 
@@ -434,8 +434,12 @@ If you want progressive enhancement, render a server-side fallback in a sibling 
 
 ```html
 <style>
-    [data-island] { visibility: hidden; }
-    [data-island]:empty { display: none; }
+  [data-island] {
+    visibility: hidden;
+  }
+  [data-island]:empty {
+    display: none;
+  }
 </style>
 ```
 
