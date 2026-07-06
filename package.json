@@ -1,15 +1,15 @@
 {
   "name": "blade-islands",
-  "version": "0.1.1",
-  "description": "Blade islands for Laravel",
+  "version": "0.2.0",
+  "description": "Client-side island runtime for React, Vue, and Svelte in Laravel Blade. Maintained fork of eznix86/blade-islands.",
   "license": "MIT",
-  "homepage": "https://github.com/eznix86/blade-islands",
+  "homepage": "https://github.com/akrista/blade-islands",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/eznix86/blade-islands.git"
+    "url": "git+https://github.com/akrista/blade-islands.git"
   },
   "bugs": {
-    "url": "https://github.com/eznix86/blade-islands/issues"
+    "url": "https://github.com/akrista/blade-islands/issues"
   },
   "keywords": [
     "blade",
@@ -20,7 +20,17 @@
     "svelte",
     "vite"
   ],
-  "author": "Bruno Bernard <contact.brunobernard@gmail.com>",
+  "author": {
+    "name": "Bruno Bernard",
+    "email": "contact.brunobernard@gmail.com",
+    "url": "https://github.com/eznix86"
+  },
+  "contributors": [
+    {
+      "name": "Akrista",
+      "url": "https://github.com/akrista"
+    }
+  ],
   "type": "module",
   "files": [
     "src",
@@ -28,7 +38,10 @@
     "LICENSE"
   ],
   "scripts": {
-    "test": "vitest run"
+    "test": "vitest run",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "prettier --check ."
   },
   "exports": {
     "./react": "./src/react/index.js",
@@ -56,7 +69,8 @@
     }
   },
   "devDependencies": {
-    "jsdom": "^26.1.0",
-    "vitest": "^3.2.4"
+    "jsdom": "^29.0.0",
+    "prettier": "^3.6.0",
+    "vitest": "^4.0.0"
   }
 }

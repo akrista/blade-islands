@@ -1,30 +1,30 @@
 export class Mounter {
   constructor() {
-    this.instances = new WeakMap()
+    this.instances = new WeakMap();
   }
 
   async mount(Component, element, props, { preserve = false } = {}) {
-    const instance = this.instances.get(element)
+    const instance = this.instances.get(element);
 
     if (instance && preserve) {
-      return
+      return;
     }
 
     if (instance) {
-      await this.unmountInstance(instance, element)
-      this.instances.delete(element)
+      await this.unmountInstance(instance, element);
+      this.instances.delete(element);
     }
 
-    this.prepareElement(element)
+    this.prepareElement(element);
 
-    const nextInstance = await this.createInstance(Component, element, props)
+    const nextInstance = await this.createInstance(Component, element, props);
 
-    this.instances.set(element, nextInstance)
+    this.instances.set(element, nextInstance);
   }
 
   prepareElement() {}
 
   async unmountInstance(instance) {
-    instance.unmount?.()
+    instance.unmount?.();
   }
 }

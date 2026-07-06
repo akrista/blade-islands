@@ -1,18 +1,18 @@
-import { createApp } from 'vue'
-import { Mounter } from '../shared/mounter.js'
+import { createApp } from 'vue';
+import { Mounter } from '../shared/mounter.js';
 
 class VueMounter extends Mounter {
   prepareElement(element) {
-    element.innerHTML = ''
+    element.innerHTML = '';
   }
 
   async createInstance(Component, element, props) {
-    const app = createApp(Component, props)
+    const app = createApp(Component, props);
 
-    app.mount(element)
+    app.mount(element);
 
-    return app
+    return app;
   }
 }
 
-export default new VueMounter()
+export default new VueMounter();

@@ -1,0 +1,10 @@
+* text=auto eol=lf
+
+*.js diff=javascript
+*.md diff=markdown
+*.json diff=json
+
+CHANGELOG.md export-ignore
+README.md export-ignore
+.github/ export-ignore
+art/ export-ignore

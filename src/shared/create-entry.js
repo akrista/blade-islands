@@ -1,4 +1,4 @@
-import { createIslands } from './create-islands.js'
+import { createIslands } from './create-islands.js';
 
 export function createEntry({ type, components, mounter }) {
   return createIslands({
@@ -6,5 +6,5 @@ export function createEntry({ type, components, mounter }) {
     selector: `[data-island="${type}"]`,
     mounter,
     components,
-  })
+  });
 }
