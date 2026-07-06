@@ -14,7 +14,7 @@ Client-side island runtime for Blade.
 
 Blade Islands lets you render small React, Vue, or Svelte components inside Laravel Blade views without turning your application into a full single-page app.
 
-This package provides the browser runtime. The Blade directives that render island placeholders live in the companion Laravel package [`akrista/blade-islands`](https://github.com/akrista/blade-islands).
+This package provides the browser runtime. The Blade directives that render island placeholders live in the companion Laravel package [`akrista/blade-islands`](https://github.com/akrista/laravel-blade-islands).
 
 ## Contents
 
@@ -22,15 +22,21 @@ This package provides the browser runtime. The Blade directives that render isla
 - [Installation](#installation)
 - [Quick Start](#quick-start)
 - [How It Works](#how-it-works)
+- [DOM Contract](#dom-contract)
 - [Entry Points](#entry-points)
 - [Vite Setup](#vite-setup)
 - [Component Resolution](#component-resolution)
 - [Custom Root](#custom-root)
 - [Preserve Mounted Islands](#preserve-mounted-islands)
+- [Multiple Frameworks](#multiple-frameworks)
+- [Props](#props)
 - [Options](#options)
+- [API Reference](#api-reference)
+- [SSR &amp; No-JavaScript](#ssr--no-javascript)
 - [Requirements](#requirements)
 - [Companion Package](#companion-package)
 - [Blade Islands vs X](#blade-islands-vs-x)
+- [Troubleshooting](#troubleshooting)
 - [Testing](#testing)
 - [Contributing](#contributing)
 - [License](#license)
@@ -166,6 +172,32 @@ mounts:
 resources/js/islands/Account/UsageChart.jsx
 ```
 
+## DOM Contract
+
+The companion Laravel package renders placeholder elements that this runtime looks for. Each placeholder is a `<div>` with a set of `data-*` attributes:
+
+| Attribute       | Always emitted | Description                                                                                              |
+| --------------- | -------------- | -------------------------------------------------------------------------------------------------------- |
+| `data-island`   | yes            | Framework marker. One of `react`, `vue`, or `svelte`. Matches the entry point you import.                |
+| `data-component`| yes            | Component name, relative to your island root. Nested folders use `/` (for example `Billing/Invoices/Table`). |
+| `data-props`    | yes            | JSON-encoded props object. The value is HTML-escaped; the runtime decodes it transparently via `element.dataset.props`. |
+| `data-preserve` | when preserved | `true` if the island was rendered with `preserve: true`. Tells the runtime to keep the mounted instance across repeat boot passes. |
+| `data-key`      | when preserved | Stable identifier for the island. Defaults to `{framework}:{component}` (lowercased) when not provided. Used to keep the DOM identity stable across renders. |
+
+A placeholder rendered by `@react('Account/UsageChart', ['stats' => $stats], preserve: true, key: 'usage-chart')` looks like:
+
+```html
+<div
+    data-island="react"
+    data-component="Account/UsageChart"
+    data-props="&quot;stats&quot;:{&quot;revenue&quot;:4200}"
+    data-preserve="true"
+    data-key="usage-chart"
+></div>
+```
+
+This runtime only scans elements whose `data-island` matches the framework you imported. The placeholders themselves contain no rendered output until JavaScript runs, so they degrade gracefully — see [SSR &amp; No-JavaScript](#ssr--no-javascript).
+
 ## Entry Points
 
 Blade Islands provides framework-specific entry points:
@@ -176,7 +208,7 @@ import islands from 'blade-islands/vue';
 import islands from 'blade-islands/svelte';
 ```
 
-Each entry point mounts only its own island type.
+Each entry point mounts only its own island type and ignores the others, so you can ship more than one framework in the same app — see [Multiple Frameworks](#multiple-frameworks).
 
 ## Vite Setup
 
@@ -264,9 +296,9 @@ resolves to `resources/js/widgets/Dashboard.vue`.
 
 ## Preserve Mounted Islands
 
-Use `preserve: true` when the same DOM is processed more than once and you want Blade Islands to keep an existing island mounted instead of mounting it again.
+Use `preserve: true` when the same DOM is processed more than once and you want Blade Islands to keep an existing island mounted instead of unmounting and remounting it.
 
-This is useful when the page or a DOM fragment is recalculated and your frontend boot logic runs again.
+This is useful when the page or a DOM fragment is recalculated and your frontend boot logic runs again — for example, after a Livewire or Turbo update re-runs your entry script.
 
 ```php
 @react('Dashboard/RevenueChart', ['stats' => $stats], preserve: true)
@@ -274,12 +306,86 @@ This is useful when the page or a DOM fragment is recalculated and your frontend
 @svelte('Dashboard/RevenueChart', ['stats' => $stats], preserve: true)
 ```
 
-If you reuse a preserved component in a loop, give each island a unique key on the Blade side so the runtime can distinguish them correctly:
+When `preserve` is `true`:
+
+- on the first mount, the island is mounted and tracked by element reference
+- on subsequent boot passes, the same element is detected and skipped
+
+When `preserve` is `false` (the default), the previous instance is unmounted and a new one is created with the latest props. This is the right behavior when props change but the element identity does not.
+
+The Laravel package also emits a `data-key` attribute for preserved islands. By default it is `{framework}:{component}` (lowercased), but you can pass an explicit `key` argument so each instance is uniquely identifiable — important when you reuse the same component in a loop:
 
 ```php
 @foreach ($products as $product)
     @react('Product/Card', ['product' => $product], preserve: true, key: "product-{$product->id}")
 @endforeach
+```
+
+The runtime tracks preserved instances by DOM element reference, so the explicit key keeps the HTML stable across server-side re-renders and prevents the runtime from remounting a freshly-emitted placeholder.
+
+## Multiple Frameworks
+
+Each entry point scans only for its own `data-island` value, so you can mix frameworks in the same app. Call each entry's default export once:
+
+```js
+// resources/js/app.js
+import reactIslands from 'blade-islands/react';
+import vueIslands from 'blade-islands/vue';
+
+reactIslands();
+vueIslands();
+```
+
+Keep the components glob for each framework in its own call when you need custom roots:
+
+```js
+import reactIslands from 'blade-islands/react';
+import vueIslands from 'blade-islands/vue';
+
+reactIslands({
+  root: '/resources/js/react-islands',
+  components: import.meta.glob('/resources/js/react-islands/**/*.{jsx,tsx}'),
+});
+
+vueIslands({
+  root: '/resources/js/vue-islands',
+  components: import.meta.glob('/resources/js/vue-islands/**/*.vue'),
+});
+```
+
+## Props
+
+Props are passed from Blade as a PHP array and serialized into the `data-props` attribute as JSON. Anything that round-trips through `json_encode` / `JSON.parse` is supported, including:
+
+- strings, numbers, booleans, `null`
+- arrays and nested objects
+- ISO date strings (parse them on the frontend)
+
+These are **not** supported because they cannot survive JSON serialization:
+
+- closures, functions, or any callable
+- PHP resources
+- live Eloquent model instances (use the array or a DTO instead)
+
+Example with a complex prop:
+
+```php
+@react('Orders/Table', [
+    'orders' => $orders->map(fn ($order) => [
+        'id' => $order->id,
+        'total' => $order->total,
+        'placedAt' => $order->placed_at->toIso8601String(),
+    ])->all(),
+    'currency' => 'USD',
+])
+```
+
+On the frontend:
+
+```jsx
+export default function OrdersTable({ orders, currency }) {
+  // ...
+}
 ```
 
 ## Options
@@ -293,8 +399,56 @@ islands({
 });
 ```
 
-- `root` - component root used to derive names such as `Billing/Invoices/Table`
-- `components` - Vite `import.meta.glob(...)` map for the current framework
+- `root` — component root used to derive names such as `Billing/Invoices/Table`. Trailing slashes are ignored. Defaults to `/resources/js/islands`.
+- `components` — Vite `import.meta.glob(...)` map for the current framework. The default entry points ship a glob that matches the default root; you only need to override this when you change the root or limit the file extensions you want to match.
+
+The function is idempotent. Calling it again with the same options is safe — preserved islands stay mounted, non-preserved islands are remounted with their latest props.
+
+## API Reference
+
+```js
+import islands from 'blade-islands/react'; // or /vue, /svelte
+
+islands(options?);
+```
+
+**Parameters**
+
+- `options` _(optional)_
+  - `root` _(`string`, default `'/resources/js/islands'`)_ — base path used to compute component names. The `data-component` value on a placeholder is resolved relative to this root.
+  - `components` _(`Record<string, () => Promise<{ default: Component }>>`, default `import.meta.glob(...)` from the matching entry point)_ — map of file paths to dynamic imports. The key must include the leading `/` and the full file extension.
+
+**Returns** — `void`.
+
+**Side effects**
+
+- Scans `document` for elements matching the framework's selector (`[data-island="react"]`, `[data-island="vue"]`, or `[data-island="svelte"]`).
+- If called before `DOMContentLoaded`, waits for the event before scanning.
+- Mounts each matching component. Errors are caught and logged via `console.error`; one failing island does not block the others.
+
+## SSR &amp; No-JavaScript
+
+The placeholders emitted by the Laravel package are empty `<div>` elements, so a Blade page with islands renders the same way with JavaScript disabled as it would on the server side of a typical island-architecture site. The placeholders take no visual space until the runtime mounts the component.
+
+If you want progressive enhancement, render a server-side fallback in a sibling element and remove it once the island is mounted, or use CSS to hide the placeholder until JavaScript runs:
+
+```html
+<style>
+    [data-island] { visibility: hidden; }
+    [data-island]:empty { display: none; }
+</style>
+```
+
+If you need fully styled no-JS fallbacks, render them manually around the directive:
+
+```blade
+<button type="button" data-js-required>
+    {{ $cart->count() }} items in cart
+</button>
+@react('Cart/Button', ['count' => $cart->count()])
+```
+
+…and let the component replace the static markup once it boots. The placeholder itself is always an empty `<div>`.
 
 ## Requirements
 
@@ -308,7 +462,7 @@ islands({
 This runtime expects Blade placeholders generated by the Laravel package:
 
 - Composer package: `akrista/blade-islands`
-- Repository: [github.com/akrista/blade-islands](https://github.com/akrista/blade-islands)
+- Repository: [github.com/akrista/laravel-blade-islands](https://github.com/akrista/laravel-blade-islands)
 
 ## Blade Islands vs X
 
@@ -329,6 +483,36 @@ Blade Islands is more naturally suited to Blade-first applications that want pro
 Laravel UI is a legacy scaffolding package for frontend presets and authentication views.
 
 Blade Islands solves a different problem: adding targeted client-side interactivity to server-rendered Blade pages.
+
+## Troubleshooting
+
+**`[blade-islands] No react islands were found`**
+
+The `data-island` attribute on the placeholder does not match the framework you imported, or the placeholder was not emitted by the Laravel package. Inspect the rendered HTML and confirm `<div data-island="react" ...>` is present.
+
+**`[blade-islands] react island "Account/UsageChart" was not found`**
+
+The component name in `data-component` has no matching file under the configured `root`. Check that the file exists and matches the glob you provided. Names use `/` for nested folders and must omit the file extension.
+
+**`[blade-islands] No component loaders were configured for react`**
+
+You passed an explicit `components` map that was empty or falsy. If you are overriding the default, double-check the `import.meta.glob(...)` pattern.
+
+**`[blade-islands] Failed to mount: react support is not available. Install the react runtime to mount these islands.`**
+
+The framework peer dependency is not installed. Run `npm install react react-dom` (or the equivalent for your framework) and make sure it is reachable from your build.
+
+**My component mounts but its state resets on every page navigation**
+
+You are not preserving the instance. Mark the island as `preserve: true` and give it a stable `key` so the runtime can recognize the same element across re-renders.
+
+**My Vite build is large even though I only use a few islands**
+
+Vite splits the chunks, but every import.meta.glob path is included in the bundle. Use a more specific glob (for example `/resources/js/islands/**/*.jsx` instead of `**/*`) and confirm your islands live under the configured root, not elsewhere in the project.
+
+**Props arrive as strings**
+
+`data-props` is a JSON object; the runtime parses it with `JSON.parse`. If you see a string, your custom Blade wrapper likely re-encoded the value twice (for example, calling `e()` after the directive output), or you rendered the JSON inside `{{ }}` instead of `{!! !!}`. The companion Laravel package handles encoding for you — render it as-is from the directive.
 
 ## Testing
 

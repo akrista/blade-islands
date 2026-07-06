@@ -1,5 +1,5 @@
 {
-  "name": "blade-islands",
+  "name": "@akrista/blade-islands",
   "version": "0.2.0",
   "description": "Client-side island runtime for React, Vue, and Svelte in Laravel Blade. Maintained fork of eznix86/blade-islands.",
   "license": "MIT",
@@ -41,7 +41,8 @@
     "test": "vitest run",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "lint": "prettier --check ."
+    "lint": "prettier --check .",
+    "prepublishOnly": "npm run lint && npm test"
   },
   "exports": {
     "./react": "./src/react/index.js",
